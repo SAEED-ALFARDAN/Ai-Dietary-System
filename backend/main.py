@@ -16,7 +16,7 @@ app = FastAPI()
 init_db()
 
 # Load YOLOv8 model once at startup (path to your trained weights)
-model = YOLO("/home/saeed/Projects/Ai-Dietary-System/models/best.pt")
+model = YOLO("C:\\Users\\igohs\\Desktop\\Ai-Dietary-System\\models\\last.pt")
 
 
 class FoodItemOut(BaseModel):
@@ -62,7 +62,13 @@ async def analyze(
 
     # 3. Run YOLOv8 inference
     try:
-        results = model(pil_img)[0]
+        results = model.predict(
+    pil_img, 
+    conf=0.20,      # Lower confidence
+    iou=0.45,       # Allow overlap
+    augment=True,   # FORCE multi-scale inference (Crucial fix)
+    agnostic_nms=True # Prevents overlapping boxes of different classes from canceling each other
+)[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model inference failed: {e}")
 
