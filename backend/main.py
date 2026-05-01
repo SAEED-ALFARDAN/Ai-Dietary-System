@@ -30,14 +30,28 @@ MIN_CONF = float(os.getenv("MIN_CONF", "0.25"))
 
 # Common model-label variants mapped to DB names.
 FOOD_ALIASES = {
-    "softdrink": "soft_drink",
-    "soft-drink": "soft_drink",
-    "soft drink": "soft_drink",
-    "soda": "soft_drink",
-    "french_fries": "fries",
-    "french-fries": "fries",
-    "french fries": "fries",
-    "shawerma": "shawarma",
+    # soft drinks — all possible forms
+    "soft drinks":  "soft_drinks",
+    "soft drink":   "soft_drinks",
+    "soft_drink":   "soft_drinks",
+    "softdrinks":   "soft_drinks",
+    "softdrink":    "soft_drinks",
+    "soft-drinks":  "soft_drinks",
+    "soft-drink":   "soft_drinks",
+    "soda":         "soft_drinks",
+
+    # fried chicken
+    "fried chicken":  "fried_chicken",
+    "fried-chicken":  "fried_chicken",
+    "friedchicken":   "fried_chicken",
+
+    # fries
+    "french_fries":   "fries",
+    "french-fries":   "fries",
+    "french fries":   "fries",
+
+    # shawarma
+    "shawerma":  "shawarma",
 }
 
 

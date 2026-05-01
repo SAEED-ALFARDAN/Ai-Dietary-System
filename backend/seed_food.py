@@ -1,55 +1,30 @@
-from database import SessionLocal, init_db, Food
+from database import SessionLocal, Food
 
-init_db()
+db = SessionLocal()
 
-foods = [
+missing = [
     Food(
-        food_id=1,
-        name="burger",
+        name="donut",
         category="Fast Food",
-        serving_size=150.0,
-        calories=600.0,
-        protein_g=25.0,
-        carbs_g=50.0,
-        fat_g=30.0,
+        serving_size=60.0,
+        calories=250.0,
+        protein_g=4.0,
+        carbs_g=32.0,
+        fat_g=12.0,
         source="USDA / FoodData Central",
     ),
     Food(
-        food_id=2,
-        name="fries",
+        name="fried_chicken",   # model label "fried chicken" → normalized to this
         category="Fast Food",
-        serving_size=100.0,
-        calories=300.0,
-        protein_g=3.0,
-        carbs_g=40.0,
-        fat_g=15.0,
+        serving_size=140.0,
+        calories=400.0,
+        protein_g=30.0,
+        carbs_g=15.0,
+        fat_g=24.0,
         source="USDA / FoodData Central",
     ),
     Food(
-        food_id=3,
-        name="pizza",
-        category="Fast Food",
-        serving_size=120.0,
-        calories=285.0,
-        protein_g=12.0,
-        carbs_g=36.0,
-        fat_g=10.0,
-        source="USDA / FoodData Central",
-    ),
-    Food(
-        food_id=4,
-        name="shawarma",
-        category="Fast Food",
-        serving_size=180.0,
-        calories=450.0,
-        protein_g=25.0,
-        carbs_g=40.0,
-        fat_g=20.0,
-        source="USDA / FoodData Central",
-    ),
-    Food(
-        food_id=5,
-        name="soft_drink",
+        name="soft_drinks",     # model label "soft drinks" → normalized to this
         category="Beverage",
         serving_size=330.0,
         calories=140.0,
@@ -60,13 +35,13 @@ foods = [
     ),
 ]
 
-db = SessionLocal()
-
-for f in foods:
-    existing = db.query(Food).filter(Food.food_id == f.food_id).first()
-    if not existing:
+for f in missing:
+    exists = db.query(Food).filter(Food.name == f.name).first()
+    if not exists:
         db.add(f)
+        print(f"✅ Added: {f.name}")
+    else:
+        print(f"⏭️ Already exists: {f.name}")
 
 db.commit()
 db.close()
-print("Seeded Food table.")
