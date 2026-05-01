@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Dict
+import os
 
 from ultralytics import YOLO
 from PIL import Image
@@ -17,6 +18,66 @@ init_db()
 
 # Load YOLOv8 model once at startup (path to your trained weights)
 model = YOLO("C:\\Users\\igohs\\Desktop\\Ai-Dietary-System\\models\\last.pt")
+
+# Portion scaling configs (override via environment variables if needed)
+REFERENCE_OBJECT_LABEL = os.getenv("REFERENCE_OBJECT_LABEL", "card").lower()
+REFERENCE_OBJECT_REAL_AREA_CM2 = float(os.getenv("REFERENCE_OBJECT_REAL_AREA_CM2", "46.6"))
+BASE_FOOD_AREA_CM2 = float(os.getenv("BASE_FOOD_AREA_CM2", "100.0"))
+FALLBACK_BASE_IMAGE_AREA_RATIO = float(os.getenv("FALLBACK_BASE_IMAGE_AREA_RATIO", "0.16"))
+MIN_PORTION_RATIO = float(os.getenv("MIN_PORTION_RATIO", "0.5"))
+MAX_PORTION_RATIO = float(os.getenv("MAX_PORTION_RATIO", "2.5"))
+MIN_CONF = float(os.getenv("MIN_CONF", "0.25"))
+
+# Common model-label variants mapped to DB names.
+FOOD_ALIASES = {
+    "softdrink": "soft_drink",
+    "soft-drink": "soft_drink",
+    "soft drink": "soft_drink",
+    "soda": "soft_drink",
+    "french_fries": "fries",
+    "french-fries": "fries",
+    "french fries": "fries",
+    "shawerma": "shawarma",
+}
+
+
+def _box_area(box) -> float:
+    xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
+    x1, y1, x2, y2 = xyxy
+    return max((x2 - x1), 0.0) * max((y2 - y1), 0.0)
+
+
+def _normalize_label(label: str) -> str:
+    return label.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _candidate_food_keys(label: str) -> List[str]:
+    normalized = _normalize_label(label)
+    alias = FOOD_ALIASES.get(label.lower()) or FOOD_ALIASES.get(normalized)
+    keys = [normalized]
+    if alias and alias not in keys:
+        keys.append(alias)
+    if normalized.endswith("es") and len(normalized) > 2:
+        keys.append(normalized[:-2])
+    if normalized.endswith("s") and len(normalized) > 1:
+        keys.append(normalized[:-1])
+    # Keep order while removing duplicates.
+    seen = set()
+    ordered = []
+    for k in keys:
+        if k not in seen:
+            seen.add(k)
+            ordered.append(k)
+    return ordered
+
+
+def _fallback_portion_ratio_by_image_area(box_area: float, img_area: float) -> float:
+    # Continuous fallback ratio (no categorical buckets).
+    if img_area <= 0 or FALLBACK_BASE_IMAGE_AREA_RATIO <= 0:
+        return 1.0
+    relative_area = box_area / img_area
+    portion_ratio = relative_area / FALLBACK_BASE_IMAGE_AREA_RATIO
+    return max(MIN_PORTION_RATIO, min(MAX_PORTION_RATIO, portion_ratio))
 
 
 class FoodItemOut(BaseModel):
@@ -72,8 +133,19 @@ async def analyze(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model inference failed: {e}")
 
-    MIN_CONF = 0.4
     items: List[FoodItemOut] = []
+    reference_area_px = 0.0
+
+    # Find reference object (largest high-confidence box for the configured class)
+    for box in results.boxes:
+        cls_id = int(box.cls[0])
+        label = results.names[cls_id].lower()
+        conf = float(box.conf[0])
+        if conf < MIN_CONF or _normalize_label(label) != _normalize_label(REFERENCE_OBJECT_LABEL):
+            continue
+        area = _box_area(box)
+        if area > reference_area_px:
+            reference_area_px = area
 
     # 4. For each detection, map to Food row and compute nutrition
     for box in results.boxes:
@@ -84,26 +156,26 @@ async def analyze(
         if conf < MIN_CONF:
             continue
 
-        key = label.lower()
-
         # Look up in Food table
-        food: Food | None = db.query(Food).filter(Food.name == key).first()
+        food: Food | None = None
+        for key in _candidate_food_keys(label):
+            food = db.query(Food).filter(Food.name == key).first()
+            if food is not None:
+                break
         if food is None:
             # Unknown class; skip this detection
             continue
 
-        # Portion estimation by relative bounding box area (simple heuristic)
-        xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
-        x1, y1, x2, y2 = xyxy
-        box_area = max((x2 - x1), 0) * max((y2 - y1), 0)
-        relative_area = box_area / img_area if img_area > 0 else 0.0
-
-        if relative_area < 0.10:
-            portion_ratio = 0.75  # small
-        elif relative_area < 0.25:
-            portion_ratio = 1.0   # medium
+        # Portion estimation by reference-object scaling when available.
+        box_area = _box_area(box)
+        if reference_area_px > 0 and REFERENCE_OBJECT_REAL_AREA_CM2 > 0 and BASE_FOOD_AREA_CM2 > 0:
+            cm2_per_px = REFERENCE_OBJECT_REAL_AREA_CM2 / reference_area_px
+            estimated_food_area_cm2 = box_area * cm2_per_px
+            portion_ratio = estimated_food_area_cm2 / BASE_FOOD_AREA_CM2
+            portion_ratio = max(MIN_PORTION_RATIO, min(MAX_PORTION_RATIO, portion_ratio))
         else:
-            portion_ratio = 1.5   # large
+            # Safe fallback if reference object is not present in the image.
+            portion_ratio = _fallback_portion_ratio_by_image_area(box_area, img_area)
 
         calories = food.calories * portion_ratio
         protein_g = food.protein_g * portion_ratio
