@@ -1,83 +1,79 @@
-from database import SessionLocal, init_db, Food
+print("REAL SEED FILE EXECUTED")
+from database import SessionLocal, Food, init_db
 
-init_db()
 
-foods = [
-    Food(
-        food_id=1,
-        name="burger",
-        category="Fast Food",
-        serving_size=150.0,
-        calories=856.0,
-        protein_g=45.0,
-        carbs_g=60.0,
-        fat_g=48.0,
-        source="USDA / FoodData Central",
-    ),
-    Food(
-        food_id=2,
-        name="donut",
-        category="Bakery",
-        serving_size=60.0,
-        calories=253.0,
-        protein_g=4.0,
-        carbs_g=30.0,
-        fat_g=14.0,
-        source="USDA / FoodData Central",
-    ),
-    Food(
-        food_id=3,
-        name="fried_chicken",
-        category="Fast Food",
-        serving_size=150.0,
-        calories=405.0,
-        protein_g=30.0,
-        carbs_g=16.0,
-        fat_g=26.0,
-        source="USDA / FoodData Central",
-    ),
-    Food(
-        food_id=4,
-        name="fries",
-        category="Fast Food",
-        serving_size=100.0,
-        calories=302.0,
-        protein_g=3.5,
-        carbs_g=38.0,
-        fat_g=16.0,
-        source="USDA / FoodData Central",
-    ),
-    Food(
-        food_id=5,
-        name="pizza",
-        category="Fast Food",
-        serving_size=120.0,
-        calories=320.0,
-        protein_g=13.0,
-        carbs_g=37.0,
-        fat_g=13.0,
-        source="USDA / FoodData Central",
-    ),
-    Food(
-        food_id=6,
-        name="soft_drink",
-        category="Beverage",
-        serving_size=330.0,
-        calories=140.0,
-        protein_g=0.0,
-        carbs_g=35.0,
-        fat_g=0.0,
-        source="USDA / FoodData Central",
-    ),
-]
+def seed_food_data():
+    init_db()
+    db = SessionLocal()
 
-db = SessionLocal()
+    if db.query(Food).count() > 0:
+        db.close()
+        return
 
-for f in foods:
-    existing = db.query(Food).filter(Food.food_id == f.food_id).first()
-    if not existing:
-        db.add(f)
+    foods = [
+        Food(
+            name="burger",
+            category="fast_food",
+            serving_size=150,
+            calories=393,
+            protein_g=23,
+            carbs_g=32,
+            fat_g=19,
+            source="USDA",
+        ),
+        Food(
+            name="pizza",
+            category="fast_food",
+            serving_size=200,
+            calories=532,
+            protein_g=22,
+            carbs_g=66,
+            fat_g=20,
+            source="USDA",
+        ),
+        Food(
+            name="fries",
+            category="fast_food",
+            serving_size=50,
+            calories=156,
+            protein_g=1.6,
+            carbs_g=20.4,
+            fat_g=7.5,
+            source="USDA",
+        ),
+        Food(
+            name="soft_drinks",
+            category="fast_food",
+            serving_size=350,
+            calories=144,
+            protein_g=0,
+            carbs_g=38,
+            fat_g=0,
+            source="USDA",
+        ),
+        Food(
+            name="donut",
+            category="fast_food",
+            serving_size=52,
+            calories=200,
+            protein_g=2,
+            carbs_g=22,
+            fat_g=11,
+            source="USDA",
+        ),
+        Food(
+            name="fried_chicken",
+            category="fast_food",
+            serving_size=83,
+            calories=205,
+            protein_g=19,
+            carbs_g=4,
+            fat_g=12.2,
+            source="USDA",
+        ),
+    ]
 
-db.commit()
-db.close()
-print("Seeded Food table.")
+    db.add_all(foods)
+    db.commit()
+    db.close()
+    print("Database seeded successfully.")
