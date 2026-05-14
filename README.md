@@ -39,15 +39,10 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3) Prepare the model file
+### 3) The model file
 
 The backend expects the YOLO model at `backend/models/last.pt`.
-If that file is missing, copy it from the repo root:
 
-```bash
-mkdir -p backend/models
-cp models/last.pt backend/models/last.pt
-```
 
 ### 4) Seed the database
 
